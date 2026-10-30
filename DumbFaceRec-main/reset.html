@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reset Roster Data</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #0D1113;
+      --panel: #161B1E;
+      --panel-2: #1B2226;
+      --line: #262D31;
+      --text: #E7ECEE;
+      --muted: #8A9499;
+      --amber: #F2B84B;
+      --green: #3DDC84;
+      --red: #E5484D;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 20px 60px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 760px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    h1 .dot {
+      color: var(--red);
+    }
+
+    header a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 2px;
+    }
+
+    header a:hover {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+
+    main {
+      width: 100%;
+      max-width: 760px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 18px;
+    }
+
+    .panel h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 0 0 4px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .panel .sub {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0 0 14px;
+    }
+
+    .bulk-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 9px 16px;
+      border-radius: 5px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: #3a4247;
+    }
+
+    button.danger {
+      background: var(--red);
+      color: #250607;
+      border-color: var(--red);
+    }
+
+    button.danger:hover {
+      filter: brightness(1.08);
+    }
+
+    button:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    button.small {
+      padding: 5px 10px;
+      font-size: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th {
+      text-align: left;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      padding: 8px 6px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    td {
+      padding: 8px 6px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .pill {
+      display: inline-block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+
+    .pill.on {
+      color: var(--green);
+      border-color: var(--green);
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--amber);
+      flex-shrink: 0;
+    }
+
+    .status-dot.ok {
+      background: var(--green);
+    }
+
+    .status-dot.error {
+      background: var(--red);
+    }
+
+    #statusText {
+      color: var(--muted);
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 8px 6px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1><span class="dot">●</span> Reset Roster Data</h1>
+    <a href="checkin.html">&larr; Back to scanner</a>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>BULK ACTIONS</h2>
+      <p class="sub">These apply to every person on the roster at once. There's no undo — the descriptor and
+        check-in timestamp are gone once cleared.</p>
+      <div class="bulk-actions">
+        <button class="danger" id="resetAllCheckins">Reset ALL check-ins</button>
+        <button class="danger" id="resetAllFaces">Reset ALL face data</button>
+        <button class="danger" id="resetEverything">Reset everything</button>
+        <button id="refreshBtn">Refresh list</button>
+      </div>
+      <div class="status-row">
+        <div class="status-dot" id="statusDot"></div>
+        <div id="statusText">Loading roster&hellip;</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>ROSTER</h2>
+      <p class="sub">Per-person reset. "Face" clears the stored face descriptor (they'll need to use "Register a
+        face" again). "Check-in" clears their checked-in status only.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Face on file</th>
+            <th>Checked in</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rosterBody">
+          <tr>
+            <td class="empty" colspan="4">Loading&hellip;</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const SUPABASE_URL = 'https://pxjmmvzrtvildmwntaco.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_ms7JHyuG3BsnFr3NH-iLjA_rRFDmKZ1';
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const rosterBody = document.getElementById('rosterBody');
+    const resetAllCheckinsBtn = document.getElementById('resetAllCheckins');
+    const resetAllFacesBtn = document.getElementById('resetAllFaces');
+    const resetEverythingBtn = document.getElementById('resetEverything');
+    const refreshBtn = document.getElementById('refreshBtn');
+
+    function setStatus(kind, text) {
+      statusDot.className = 'status-dot ' + kind;
+      statusText.textContent = text;
+    }
+
+    function setBulkButtonsDisabled(disabled) {
+      resetAllCheckinsBtn.disabled = disabled;
+      resetAllFacesBtn.disabled = disabled;
+      resetEverythingBtn.disabled = disabled;
+      refreshBtn.disabled = disabled;
+    }
+
+    async function loadRoster() {
+      setStatus('idle', 'Loading roster\u2026');
+      const { data, error } = await sb
+        .from('goon')
+        .select('personid, name, face_data_exist, checked')
+        .order('name', { ascending: true });
+
+      if (error) {
+        setStatus('error', 'DB error: ' + error.message);
+        return;
+      }
+      if (!data || !data.length) {
+        rosterBody.innerHTML = '<tr><td class="empty" colspan="4">No one on the roster yet.</td></tr>';
+        setStatus('ok', 'Roster is empty');
+        return;
+      }
+
+      rosterBody.innerHTML = '';
+      data.forEach(row => rosterBody.appendChild(buildRosterRow(row)));
+      setStatus('ok', `${data.length} on roster`);
+    }
+
+    function buildRosterRow(row) {
+      const tr = document.createElement('tr');
+
+      const nameTd = document.createElement('td');
+      nameTd.textContent = row.name;
+
+      const faceTd = document.createElement('td');
+      const facePill = document.createElement('span');
+      facePill.className = 'pill' + (row.face_data_exist ? ' on' : '');
+      facePill.textContent = row.face_data_exist ? 'ON FILE' : 'NONE';
+      faceTd.appendChild(facePill);
+
+      const checkedTd = document.createElement('td');
+      const checkedPill = document.createElement('span');
+      checkedPill.className = 'pill' + (row.checked ? ' on' : '');
+      checkedPill.textContent = row.checked ? 'CHECKED IN' : 'NOT CHECKED IN';
+      checkedTd.appendChild(checkedPill);
+
+      const actionsTd = document.createElement('td');
+      const actions = document.createElement('div');
+      actions.className = 'row-actions';
+
+      const faceBtn = document.createElement('button');
+      faceBtn.className = 'small';
+      faceBtn.textContent = 'Reset face';
+      faceBtn.disabled = !row.face_data_exist;
+      faceBtn.addEventListener('click', () => resetOne(row.name, { face: true }));
+
+      const checkinBtn = document.createElement('button');
+      checkinBtn.className = 'small';
+      checkinBtn.textContent = 'Reset check-in';
+      checkinBtn.disabled = !row.checked;
+      checkinBtn.addEventListener('click', () => resetOne(row.name, { checkin: true }));
+
+      actions.appendChild(faceBtn);
+      actions.appendChild(checkinBtn);
+      actionsTd.appendChild(actions);
+
+      tr.appendChild(nameTd);
+      tr.appendChild(faceTd);
+      tr.appendChild(checkedTd);
+      tr.appendChild(actionsTd);
+      return tr;
+    }
+
+    async function resetOne(name, { face = false, checkin = false }) {
+      const update = {};
+      if (face) {
+        update.face_descriptor = null;
+        update.face_data_exist = false;
+      }
+      if (checkin) {
+        update.checked = false;
+        update.check_in_time = null;
+      }
+      setStatus('idle', `Resetting ${name}\u2026`);
+      const { error } = await sb.from('goon').update(update).ilike('name', name);
+      if (error) {
+        setStatus('error', 'DB error: ' + error.message);
+        return;
+      }
+      await loadRoster();
+    }
+
+    async function resetAllCheckins() {
+      if (!confirm('Reset check-in status for EVERYONE on the roster?')) return;
+      setBulkButtonsDisabled(true);
+      setStatus('idle', 'Resetting all check-ins\u2026');
+      const { error } = await sb
+        .from('goon')
+        .update({ checked: false, check_in_time: null })
+        .not('personid', 'is', null);
+      setBulkButtonsDisabled(false);
+      if (error) { setStatus('error', 'DB error: ' + error.message); return; }
+      await loadRoster();
+    }
+
+    async function resetAllFaces() {
+      if (!confirm('Delete stored face data for EVERYONE on the roster? They will need to register again.')) return;
+      setBulkButtonsDisabled(true);
+      setStatus('idle', 'Resetting all face data\u2026');
+      const { error } = await sb
+        .from('goon')
+        .update({ face_descriptor: null, face_data_exist: false })
+        .not('personid', 'is', null);
+      setBulkButtonsDisabled(false);
+      if (error) { setStatus('error', 'DB error: ' + error.message); return; }
+      await loadRoster();
+    }
+
+    async function resetEverything() {
+      if (!confirm('This clears BOTH face data and check-in status for EVERYONE. Continue?')) return;
+      setBulkButtonsDisabled(true);
+      setStatus('idle', 'Resetting everything\u2026');
+      const { error } = await sb
+        .from('goon')
+        .update({
+          face_descriptor: null,
+          face_data_exist: false,
+          checked: false,
+          check_in_time: null
+        })
+        .not('personid', 'is', null);
+      setBulkButtonsDisabled(false);
+      if (error) { setStatus('error', 'DB error: ' + error.message); return; }
+      await loadRoster();
+    }
+
+    resetAllCheckinsBtn.addEventListener('click', resetAllCheckins);
+    resetAllFacesBtn.addEventListener('click', resetAllFaces);
+    resetEverythingBtn.addEventListener('click', resetEverything);
+    refreshBtn.addEventListener('click', loadRoster);
+
+    loadRoster();
+  </script>
+</body>
+
+</html>

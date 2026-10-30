@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Face Check-In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <style>
+    :root {
+      --bg: #0D1113;
+      --panel: #161B1E;
+      --panel-2: #1B2226;
+      --line: #262D31;
+      --text: #E7ECEE;
+      --muted: #8A9499;
+      --amber: #F2B84B;
+      --green: #3DDC84;
+      --red: #E5484D;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 20px 60px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 960px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      margin: 0;
+    }
+
+    h1 .dot {
+      color: var(--green);
+    }
+
+    header a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 2px;
+    }
+
+    header a:hover {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+
+    main {
+      width: 100%;
+      max-width: 960px;
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width:760px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 18px;
+    }
+
+    .scan-frame {
+      position: relative;
+      aspect-ratio: 4/3;
+      background: #000;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    .reticle {
+      position: absolute;
+      inset: 14px;
+      pointer-events: none;
+    }
+
+    .reticle span {
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      border-color: var(--amber);
+      border-style: solid;
+      border-width: 0;
+      transition: border-color .2s;
+    }
+
+    .reticle.match span {
+      border-color: var(--green);
+    }
+
+    .reticle.unknown span {
+      border-color: var(--red);
+    }
+
+    .reticle .tl {
+      top: 0;
+      left: 0;
+      border-top-width: 2px;
+      border-left-width: 2px;
+    }
+
+    .reticle .tr {
+      top: 0;
+      right: 0;
+      border-top-width: 2px;
+      border-right-width: 2px;
+    }
+
+    .reticle .bl {
+      bottom: 0;
+      left: 0;
+      border-bottom-width: 2px;
+      border-left-width: 2px;
+    }
+
+    .reticle .br {
+      bottom: 0;
+      right: 0;
+      border-bottom-width: 2px;
+      border-right-width: 2px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--amber);
+      flex-shrink: 0;
+    }
+
+    .status-dot.match {
+      background: var(--green);
+    }
+
+    .status-dot.unknown,
+    .status-dot.error {
+      background: var(--red);
+    }
+
+    #statusText {
+      color: var(--muted);
+    }
+
+    .controls {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 9px 16px;
+      border-radius: 5px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: #3a4247;
+    }
+
+    button.primary {
+      background: var(--green);
+      color: #08130C;
+      border-color: var(--green);
+    }
+
+    button.primary:hover {
+      filter: brightness(1.05);
+    }
+
+    button:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .panel h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 0 0 12px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .log-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+
+    .log-list li {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .log-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .log-face {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+    }
+
+    .log-list li:last-child {
+      border-bottom: none;
+    }
+
+    .log-time {
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* Unknown-face modal */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 6, 7, .72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 10;
+    }
+
+    .overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 380px;
+      padding: 22px;
+    }
+
+    .modal h3 {
+      margin: 0 0 4px;
+      font-size: 16px;
+    }
+
+    .modal p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .modal img {
+      width: 100%;
+      border-radius: 5px;
+      margin-bottom: 14px;
+      border: 1px solid var(--line);
+      transform: scaleX(-1);
+    }
+
+    .modal input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 14px;
+      margin-bottom: 12px;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .modal-msg {
+      font-size: 13px;
+      margin-top: 10px;
+      min-height: 16px;
+    }
+
+    .modal-msg.error {
+      color: var(--red);
+    }
+
+    .modal-msg.ok {
+      color: var(--green);
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1><span class="dot">●</span> Face Check-In</h1>
+    <a href="register.html">Register a face &rarr;</a>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="scan-frame">
+        <video id="video" autoplay muted playsinline></video>
+        <div class="reticle" id="reticle">
+          <span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span>
+        </div>
+      </div>
+      <div class="status-row">
+        <div class="status-dot" id="statusDot"></div>
+        <div id="statusText">Loading face models&hellip;</div>
+      </div>
+      <div class="controls">
+        <button class="primary" id="startBtn" disabled>Start scanning</button>
+        <button id="stopBtn" disabled>Pause</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>RECENT CHECK-INS</h2>
+      <ul class="log-list" id="logList">
+        <li class="empty">Nobody yet.</li>
+      </ul>
+    </section>
+  </main>
+
+  <div class="overlay" id="unknownOverlay">
+    <div class="modal">
+      <h3>Didn't recognize that face</h3>
+      <p>Enter the name on the roster. If you already have a face on file this will just update it.</p>
+      <img id="unknownShot" alt="Captured frame">
+      <input id="unknownName" type="text" placeholder="Full name" autocomplete="off">
+      <div class="modal-actions">
+        <button id="unknownCancel">Cancel</button>
+        <button class="primary" id="unknownSubmit">Check in</button>
+      </div>
+      <div class="modal-msg" id="unknownMsg"></div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://pxjmmvzrtvildmwntaco.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_ms7JHyuG3BsnFr3NH-iLjA_rRFDmKZ1';
+
+    const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+    const MATCH_THRESHOLD = 0.55; //lower = stricter match
+    const SCAN_INTERVAL_MS = 1200;
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const video = document.getElementById('video');
+    const reticle = document.getElementById('reticle');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const logList = document.getElementById('logList');
+
+    const overlay = document.getElementById('unknownOverlay');
+    const unknownShot = document.getElementById('unknownShot');
+    const unknownName = document.getElementById('unknownName');
+    const unknownSubmit = document.getElementById('unknownSubmit');
+    const unknownCancel = document.getElementById('unknownCancel');
+    const unknownMsg = document.getElementById('unknownMsg');
+
+    let knownFaces = [];   // { name, descriptor: Float32Array, checked: boolean }
+    let scanTimer = null;
+    let awaitingInput = false;
+    let pendingDescriptor = null;
+    let pendingBox = null;
+
+    function setStatus(kind, text) {
+      statusDot.className = 'status-dot ' + kind;
+      reticle.className = 'reticle ' + (kind === 'match' ? 'match' : kind === 'unknown' || kind === 'error' ? 'unknown' : '');
+      statusText.textContent = text;
+    }
+
+    async function loadModels() {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+    }
+
+    async function loadKnownFaces() {
+      const { data, error } = await sb
+        .from('goon')
+        .select('name, face_descriptor, checked')
+        .not('face_descriptor', 'is', null);
+      if (error) { setStatus('error', 'Could not load roster: ' + error.message); return; }
+      knownFaces = (data || []).map(r => ({
+        name: r.name,
+        descriptor: Float32Array.from(r.face_descriptor),
+        checked: !!r.checked
+      }));
+    }
+
+    async function loadRecentLog() {
+      const { data, error } = await sb
+        .from('goon')
+        .select('name, check_in_time')
+        .eq('checked', true)
+        .order('check_in_time', { ascending: false })
+        .limit(10);
+      if (error || !data || !data.length) return;
+      logList.innerHTML = '';
+      data.forEach(row => addLogRow(row.name, row.check_in_time));
+    }
+
+    function addLogRow(name, isoTime, faceSrc) {
+      const empty = logList.querySelector('.empty');
+      if (empty) empty.remove();
+      const li = document.createElement('li');
+      const time = new Date(isoTime);
+      const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      li.innerHTML = `
+        <div class="log-row"><span>${name}</span><span class="log-time">${timeStr}</span></div>
+        ${faceSrc ? `<img class="log-face" src="${faceSrc}" alt="${name}">` : ''}
+      `;
+      logList.prepend(li);
+    }
+
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      video.srcObject = stream;
+      await video.play();
+    }
+
+    function findMatch(descriptor) {
+      let best = null, bestDist = Infinity;
+      for (const kf of knownFaces) {
+        const d = faceapi.euclideanDistance(descriptor, kf.descriptor);
+        if (d < bestDist) { bestDist = d; best = kf; }
+      }
+      return (best && bestDist < MATCH_THRESHOLD) ? best : null;
+    }
+
+    async function checkIn(name, faceImgSrc) {
+      const nowIso = new Date().toISOString();
+      const { error } = await sb
+        .from('goon')
+        .update({ checked: true, check_in_time: nowIso })
+        .ilike('name', name);
+      if (error) { setStatus('error', 'DB error: ' + error.message); return; }
+      addLogRow(name, nowIso, faceImgSrc);
+      setStatus('match', `Checked in: ${name}`);
+    }
+
+    function captureFrame() {
+      const c = document.createElement('canvas');
+      c.width = video.videoWidth; c.height = video.videoHeight;
+      c.getContext('2d').drawImage(video, 0, 0);
+      return c.toDataURL('image/jpeg', 0.85);
+    }
+
+    function cropFace(box) {
+      const pad = 0.3; // margin around the detected box so the crop isn't too tight
+      const px = box.width * pad;
+      const py = box.height * pad;
+      const sx = Math.max(0, box.x - px);
+      const sy = Math.max(0, box.y - py);
+      const sw = Math.min(video.videoWidth - sx, box.width + px * 2);
+      const sh = Math.min(video.videoHeight - sy, box.height + py * 2);
+      const c = document.createElement('canvas');
+      c.width = sw; c.height = sh;
+      c.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+      return c.toDataURL('image/jpeg', 0.85);
+    }
+
+    function openUnknownModal(descriptor, box) {
+      awaitingInput = true;
+      pendingDescriptor = descriptor;
+      pendingBox = box;
+      unknownShot.src = captureFrame();
+      unknownName.value = '';
+      unknownMsg.textContent = '';
+      unknownMsg.className = 'modal-msg';
+      overlay.classList.add('open');
+      unknownName.focus();
+    }
+
+    function closeUnknownModal() {
+      overlay.classList.remove('open');
+      awaitingInput = false;
+      pendingDescriptor = null;
+      pendingBox = null;
+    }
+
+    async function submitUnknown() {
+      const name = unknownName.value.trim();
+      if (!name) {
+        unknownMsg.textContent = 'Type a name first.';
+        unknownMsg.className = 'modal-msg error';
+        return;
+      }
+      unknownSubmit.disabled = true;
+      const { data, error } = await sb
+        .from('goon')
+        .select('personid, face_data_exist')
+        .ilike('name', name);
+
+      if (error) {
+        unknownMsg.textContent = 'DB error: ' + error.message;
+        unknownMsg.className = 'modal-msg error';
+        unknownSubmit.disabled = false;
+        return;
+      }
+      if (!data.length) {
+        unknownMsg.textContent = 'Not on the roster — check the spelling or ask an admin to add you.';
+        unknownMsg.className = 'modal-msg error';
+        unknownSubmit.disabled = false;
+        return;
+      }
+      if (!data[0].face_data_exist) {
+        unknownMsg.textContent = 'No face on file yet — use "Register a face" first.';
+        unknownMsg.className = 'modal-msg error';
+        unknownSubmit.disabled = false;
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      const { error: updateErr } = await sb
+        .from('goon')
+        .update({
+          face_descriptor: Array.from(pendingDescriptor),
+          checked: true,
+          check_in_time: nowIso,
+          face_data_exist: true
+        })
+        .ilike('name', name);
+
+      unknownSubmit.disabled = false;
+      if (updateErr) {
+        unknownMsg.textContent = 'DB error: ' + updateErr.message;
+        unknownMsg.className = 'modal-msg error';
+        return;
+      }
+
+      knownFaces.push({ name, descriptor: pendingDescriptor, checked: true });
+      addLogRow(name, nowIso, pendingBox ? cropFace(pendingBox) : null);
+      unknownMsg.textContent = 'Checked in.';
+      unknownMsg.className = 'modal-msg ok';
+      setTimeout(() => { closeUnknownModal(); setStatus('idle', 'Scanning\u2026'); }, 700);
+    }
+
+    async function scanOnce() {
+      if (awaitingInput) return;
+      const detection = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!detection) {
+        setStatus('idle', 'No face in frame \u2014 step closer');
+        return;
+      }
+      const match = findMatch(detection.descriptor);
+      if (match) {
+        if (match.checked) {
+          setStatus('match', `${match.name} already checked in`);
+          return;
+        }
+        const faceImg = cropFace(detection.detection.box);
+        await checkIn(match.name, faceImg);
+        match.checked = true;
+      } else {
+        setStatus('unknown', 'Unrecognized \u2014 enter your name');
+        openUnknownModal(detection.descriptor, detection.detection.box);
+      }
+    }
+
+    function startScanning() {
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      setStatus('idle', 'Scanning\u2026');
+      scanTimer = setInterval(scanOnce, SCAN_INTERVAL_MS);
+    }
+
+    function stopScanning() {
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      clearInterval(scanTimer);
+      setStatus('idle', 'Paused');
+    }
+
+    unknownSubmit.addEventListener('click', submitUnknown);
+    unknownCancel.addEventListener('click', () => { closeUnknownModal(); setStatus('idle', 'Scanning\u2026'); });
+    unknownName.addEventListener('keydown', e => { if (e.key === 'Enter') submitUnknown(); });
+    startBtn.addEventListener('click', startScanning);
+    stopBtn.addEventListener('click', stopScanning);
+
+    (async function init() {
+      try {
+        setStatus('idle', 'Loading face models\u2026');
+        await loadModels();
+        setStatus('idle', 'Requesting camera\u2026');
+        await startCamera();
+        setStatus('idle', 'Loading roster\u2026');
+        await loadKnownFaces();
+        await loadRecentLog();
+        setStatus('idle', `Ready \u2014 ${knownFaces.length} face(s) on file`);
+        startBtn.disabled = false;
+      } catch (err) {
+        setStatus('error', 'Setup failed: ' + err.message);
+      }
+    })();
+  </script>
+</body>
+
+</html>

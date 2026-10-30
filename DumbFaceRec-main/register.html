@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Register Face COOL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <style>
+    :root {
+      --bg: #0D1113;
+      --panel: #161B1E;
+      --panel-2: #1B2226;
+      --line: #262D31;
+      --text: #E7ECEE;
+      --muted: #8A9499;
+      --amber: #F2B84B;
+      --green: #3DDC84;
+      --red: #E5484D;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 20px 60px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    h1 .dot {
+      color: var(--amber);
+    }
+
+    header a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 2px;
+    }
+
+    header a:hover {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 520px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 20px;
+    }
+
+    .scan-frame {
+      position: relative;
+      aspect-ratio: 4/3;
+      background: #000;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+
+    video,
+    .captured-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    .captured-img {
+      display: none;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--amber);
+      flex-shrink: 0;
+    }
+
+    .status-dot.ok {
+      background: var(--green);
+    }
+
+    .status-dot.error {
+      background: var(--red);
+    }
+
+    #statusText {
+      color: var(--muted);
+    }
+
+    form {
+      margin-top: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      font-family: 'IBM Plex Mono', monospace;
+      margin-bottom: 6px;
+    }
+
+    input[type=text] {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 15px;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+
+    .controls {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 10px 18px;
+      border-radius: 5px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: #3a4247;
+    }
+
+    button.primary {
+      background: var(--amber);
+      color: #211705;
+      border-color: var(--amber);
+    }
+
+    button.primary:hover {
+      filter: brightness(1.05);
+    }
+
+    button:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .result-msg {
+      margin-top: 14px;
+      font-size: 14px;
+      min-height: 18px;
+    }
+
+    .result-msg.error {
+      color: var(--red);
+    }
+
+    .result-msg.ok {
+      color: var(--green);
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1><span class="dot">●</span> Register a Face</h1>
+    <a href="checkin.html">&larr; Back to scanner</a>
+  </header>
+
+  <section class="panel">
+    <div class="scan-frame">
+      <video id="video" autoplay muted playsinline></video>
+      <img id="capturedImg" class="captured-img" alt="Captured photo">
+    </div>
+
+    <div class="status-row">
+      <div class="status-dot" id="statusDot"></div>
+      <div id="statusText">Loading face models&hellip;</div>
+    </div>
+
+    <div class="controls">
+      <button class="primary" id="captureBtn" disabled>Capture</button>
+      <button id="retakeBtn" style="display:none;">Retake</button>
+    </div>
+
+    <form id="nameForm" style="display:none;">
+      <label for="nameInput">Full name (must be on the roster)</label>
+      <input id="nameInput" type="text" autocomplete="off" placeholder="e.g. John Doe" required>
+      <div class="controls">
+        <button type="submit" class="primary" id="saveBtn">Save face</button>
+      </div>
+    </form>
+
+    <div class="result-msg" id="resultMsg"></div>
+  </section>
+
+  <script>
+    const SUPABASE_URL = 'https://pxjmmvzrtvildmwntaco.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_ms7JHyuG3BsnFr3NH-iLjA_rRFDmKZ1';
+
+    const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const video = document.getElementById('video');
+    const capturedImg = document.getElementById('capturedImg');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const captureBtn = document.getElementById('captureBtn');
+    const retakeBtn = document.getElementById('retakeBtn');
+    const nameForm = document.getElementById('nameForm');
+    const nameInput = document.getElementById('nameInput');
+    const saveBtn = document.getElementById('saveBtn');
+    const resultMsg = document.getElementById('resultMsg');
+
+    let currentDescriptor = null;
+
+    function setStatus(kind, text) {
+      statusDot.className = 'status-dot ' + kind;
+      statusText.textContent = text;
+    }
+    function setResult(kind, text) {
+      resultMsg.textContent = text;
+      resultMsg.className = 'result-msg ' + kind;
+    }
+
+    async function loadModels() {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+    }
+
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      video.srcObject = stream;
+      await video.play();
+    }
+
+    async function capture() {
+      setStatus('idle', 'Looking for a face\u2026');
+      const detection = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!detection) {
+        setStatus('error', 'No face detected \u2014 line up and try again');
+        return;
+      }
+
+      const c = document.createElement('canvas');
+      c.width = video.videoWidth; c.height = video.videoHeight;
+      c.getContext('2d').drawImage(video, 0, 0);
+      capturedImg.src = c.toDataURL('image/jpeg', 0.9);
+
+      currentDescriptor = detection.descriptor;
+      video.style.display = 'none';
+      capturedImg.style.display = 'block';
+      captureBtn.style.display = 'none';
+      retakeBtn.style.display = 'inline-block';
+      nameForm.style.display = 'block';
+      setStatus('ok', 'Face captured \u2014 enter the name to save it');
+    }
+
+    function retake() {
+      video.style.display = 'block';
+      capturedImg.style.display = 'none';
+      captureBtn.style.display = 'inline-block';
+      retakeBtn.style.display = 'none';
+      nameForm.style.display = 'none';
+      currentDescriptor = null;
+      setResult('', '');
+      setStatus('idle', 'Ready \u2014 line up your face and capture');
+    }
+
+    async function saveFace(e) {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      if (!name) { setResult('error', 'Type a name first.'); return; }
+      if (!currentDescriptor) { setResult('error', 'Capture a photo first.'); return; }
+
+      saveBtn.disabled = true;
+      setResult('', 'Checking roster\u2026');
+
+      const { data, error } = await sb
+        .from('goon')
+        .select('personid')
+        .ilike('name', name);
+
+      if (error) {
+        setResult('error', 'DB error: ' + error.message);
+        saveBtn.disabled = false;
+        return;
+      }
+      if (!data.length) {
+        setResult('error', 'WHO TF ARE YOU?');
+        saveBtn.disabled = false;
+        return;
+      }
+
+      const { error: updateErr } = await sb
+        .from('goon')
+        .update({
+          face_descriptor: Array.from(currentDescriptor),
+          face_data_exist: true
+        })
+        .ilike('name', name);
+
+      saveBtn.disabled = false;
+      if (updateErr) {
+        setResult('error', 'DB error: ' + updateErr.message);
+        return;
+      }
+      setResult('ok', `Saved. ${name} can check in at the scanner now.`);
+    }
+
+    captureBtn.addEventListener('click', capture);
+    retakeBtn.addEventListener('click', retake);
+    nameForm.addEventListener('submit', saveFace);
+
+    (async function init() {
+      try {
+        setStatus('idle', 'Loading face models\u2026');
+        await loadModels();
+        setStatus('idle', 'Requesting camera\u2026');
+        await startCamera();
+        setStatus('idle', 'Ready \u2014 line up your face and capture');
+        captureBtn.disabled = false;
+      } catch (err) {
+        setStatus('error', 'Setup failed: ' + err.message);
+      }
+    })();
+  </script>
+</body>
+
+</html>
